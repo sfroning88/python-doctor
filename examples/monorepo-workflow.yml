@@ -1,0 +1,49 @@
+# Example workflow for a monorepo using Python Doctor
+# Copy this to your repo: .github/workflows/python-doctor.yml
+#
+# Replace OWNER/python-doctor with your published action (e.g. seanfroning/python-doctor@v1)
+# or use @main for development before publishing a release.
+
+name: Python Doctor
+
+on:
+  pull_request:
+    branches: [staging, main]
+    paths:
+      - "apps/worker/**"
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      worker_changed: ${{ steps.filter.outputs.worker_changed }}
+    steps:
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            worker_changed:
+              - 'apps/worker/**'
+
+  python-doctor:
+    needs: changes
+    if: needs.changes.outputs.worker_changed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Run Python Doctor
+        id: doctor
+        uses: OWNER/python-doctor@v1
+        with:
+          app-path: apps/worker
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Print score
+        if: always()
+        run: echo "Health score ${{ steps.doctor.outputs.score }}/100"

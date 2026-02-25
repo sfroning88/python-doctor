@@ -1,0 +1,239 @@
+name: "Python Doctor"
+description: "Static analysis for Python monorepo apps — lint, types, security, dead code, complexity, and SQL."
+author: "Sean Froning"
+
+branding:
+  icon: "activity"
+  color: "blue"
+
+inputs:
+  app-path:
+    description: "Path to the Python app relative to repo root (e.g. apps/backend)"
+    required: true
+  python-version:
+    description: "Python version to use"
+    required: false
+    default: "3.11"
+  base-ref:
+    description: "Base branch ref to diff against (e.g. main, staging)"
+    required: false
+    default: ${{ github.base_ref || 'main' }}
+  head-sha:
+    description: "Head commit SHA"
+    required: false
+    default: ${{ github.event.pull_request.head.sha || github.sha }}
+  github-token:
+    description: "GitHub token for posting PR comments"
+    required: true
+  ruff-enabled:
+    description: "Run Ruff (lint + style)"
+    required: false
+    default: "true"
+  mypy-enabled:
+    description: "Run mypy (type checking)"
+    required: false
+    default: "true"
+  bandit-enabled:
+    description: "Run Bandit (security)"
+    required: false
+    default: "true"
+  vulture-enabled:
+    description: "Run Vulture (dead code)"
+    required: false
+    default: "true"
+  vulture-min-confidence:
+    description: "Minimum confidence threshold for Vulture (60–100)"
+    required: false
+    default: "80"
+  radon-enabled:
+    description: "Run Radon (complexity)"
+    required: false
+    default: "true"
+  markdownlint-enabled:
+    description: "Run markdownlint (Markdown linting)"
+    required: false
+    default: "true"
+  sqlfluff-enabled:
+    description: "Run SQLFluff (SQL linting)"
+    required: false
+    default: "true"
+  sqlfluff-dialect:
+    description: "SQL dialect for SQLFluff (postgres, mysql, ansi, etc.)"
+    required: false
+    default: "postgres"
+  install-dependencies:
+    description: "Whether to install project requirements.txt before analysis"
+    required: false
+    default: "true"
+  post-comment:
+    description: "Whether to post results as a PR comment"
+    required: false
+    default: "true"
+
+outputs:
+  score:
+    description: "Health score from 0–100"
+    value: ${{ steps.score.outputs.score }}
+  has-findings:
+    description: "Whether any tool reported issues (true/false)"
+    value: ${{ steps.score.outputs.has_findings }}
+
+runs:
+  using: "composite"
+  steps:
+    # ── Checkout (required for git diff) ───────────────────────────────────
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        ref: ${{ inputs.head-sha }}
+        token: ${{ inputs.github-token }}
+
+    # ── Setup ──────────────────────────────────────────────────────────────
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+        cache: "pip"
+
+    - name: Install system dependencies
+      shell: bash
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y --no-install-recommends \
+          build-essential libpq-dev gcc
+
+    - name: Install project dependencies
+      if: inputs.install-dependencies == 'true'
+      shell: bash
+      run: |
+        REQ="${{ inputs.app-path }}/requirements.txt"
+        if [ -f "$REQ" ]; then
+          pip install --quiet -r "$REQ" || \
+            echo "⚠️ Warning: Failed to install project dependencies. Type checking may be limited."
+        fi
+
+    - name: Install analysis tools
+      shell: bash
+      run: |
+        TOOLS="ruff mypy bandit[toml] vulture radon sqlfluff"
+        pip install --quiet $TOOLS
+
+    # ── Diff ───────────────────────────────────────────────────────────────
+    - name: Fetch base branch
+      shell: bash
+      env:
+        BASE_REF: ${{ inputs.base-ref }}
+      run: |
+        git fetch origin "${BASE_REF}:refs/remotes/origin/${BASE_REF}" 2>/dev/null || true
+
+    - name: Get changed files
+      shell: bash
+      env:
+        BASE_REF: ${{ inputs.base-ref }}
+        HEAD_SHA: ${{ inputs.head-sha }}
+        APP_PATH: ${{ inputs.app-path }}
+      run: bash ${{ github.action_path }}/scripts/get-changed-files.sh
+
+    # ── Analysis tools ─────────────────────────────────────────────────────
+    - name: Run Ruff
+      if: inputs.ruff-enabled == 'true'
+      shell: bash
+      run: |
+        if [ -s /tmp/pydoctor_changed_py.txt ]; then
+          cd "${{ inputs.app-path }}"
+          xargs -a /tmp/pydoctor_relative_py.txt -r \
+            ruff check --output-format=full 2>&1 | tee /tmp/pydoctor_ruff.txt || true
+        else
+          echo "" > /tmp/pydoctor_ruff.txt
+        fi
+
+    - name: Run mypy
+      if: inputs.mypy-enabled == 'true'
+      shell: bash
+      run: |
+        if [ -s /tmp/pydoctor_changed_py.txt ]; then
+          cd "${{ inputs.app-path }}"
+          xargs -a /tmp/pydoctor_relative_py.txt -r \
+            mypy --ignore-missing-imports 2>&1 | tee /tmp/pydoctor_mypy.txt || true
+        else
+          echo "" > /tmp/pydoctor_mypy.txt
+        fi
+
+    - name: Run Bandit
+      if: inputs.bandit-enabled == 'true'
+      shell: bash
+      run: |
+        if [ -s /tmp/pydoctor_changed_py.txt ]; then
+          cd "${{ inputs.app-path }}"
+          xargs -a /tmp/pydoctor_relative_py.txt -r \
+            bandit -ll 2>&1 | tee /tmp/pydoctor_bandit.txt || true
+        else
+          echo "" > /tmp/pydoctor_bandit.txt
+        fi
+
+    - name: Run Vulture
+      if: inputs.vulture-enabled == 'true'
+      shell: bash
+      run: |
+        if [ -s /tmp/pydoctor_changed_py.txt ]; then
+          cd "${{ inputs.app-path }}"
+          xargs -a /tmp/pydoctor_relative_py.txt -r \
+            vulture --min-confidence ${{ inputs.vulture-min-confidence }} \
+            2>&1 | tee /tmp/pydoctor_vulture.txt || true
+        else
+          echo "" > /tmp/pydoctor_vulture.txt
+        fi
+
+    - name: Run Radon
+      if: inputs.radon-enabled == 'true'
+      shell: bash
+      run: |
+        if [ -s /tmp/pydoctor_changed_py.txt ]; then
+          cd "${{ inputs.app-path }}"
+          {
+            xargs -a /tmp/pydoctor_relative_py.txt -r radon cc -s -n C 2>&1 || true
+            xargs -a /tmp/pydoctor_relative_py.txt -r radon mi -s -n B 2>&1 || true
+          } | tee /tmp/pydoctor_radon.txt
+        else
+          echo "" > /tmp/pydoctor_radon.txt
+        fi
+
+    - name: Run SQLFluff
+      if: inputs.sqlfluff-enabled == 'true'
+      shell: bash
+      run: |
+        if [ -s /tmp/pydoctor_changed_sql.txt ]; then
+          cd "${{ inputs.app-path }}"
+          xargs -a /tmp/pydoctor_relative_sql.txt -r \
+            sqlfluff lint --dialect ${{ inputs.sqlfluff-dialect }} \
+            2>&1 | tee /tmp/pydoctor_sqlfluff.txt || true
+        else
+          echo "" > /tmp/pydoctor_sqlfluff.txt
+        fi
+
+    - name: Run markdownlint
+      if: inputs.markdownlint-enabled == 'true'
+      shell: bash
+      run: |
+        if [ -s /tmp/pydoctor_changed_md.txt ]; then
+          cd "${{ inputs.app-path }}"
+          xargs -a /tmp/pydoctor_relative_md.txt -r \
+            npx -y markdownlint-cli@latest 2>&1 | tee /tmp/pydoctor_markdownlint.txt || true
+        else
+          echo "" > /tmp/pydoctor_markdownlint.txt
+        fi
+
+    # ── Score + comment ────────────────────────────────────────────────────
+    - name: Compute score and post comment
+      id: score
+      uses: actions/github-script@v7
+      if: always()
+      env:
+        POST_COMMENT: ${{ inputs.post-comment }}
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const result = require("${{ github.action_path }}/scripts/post-comment.js");
+          await result({ github, context, core });

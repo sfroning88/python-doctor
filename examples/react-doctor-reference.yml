@@ -1,0 +1,131 @@
+# Reference workflow for React Doctor (organization monorepo)
+# This is the companion to Python Doctor for React apps.
+# Copy to .github/workflows/react-doctor.yml in your monorepo.
+# Note: Requires scripts/filter-react-doctor-output.sh in your repo.
+
+name: React Doctor
+
+on:
+  pull_request:
+    branches: [staging, main]
+    paths:
+      - "apps/platform/**"
+      - "apps/buyer_search_tool/**"
+      - "apps/collect_tool/**"
+      - "apps/valuation_tool/**"
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      platform: ${{ steps.filter.outputs.platform }}
+      buyer_search_tool: ${{ steps.filter.outputs.buyer_search_tool }}
+      collect_tool: ${{ steps.filter.outputs.collect_tool }}
+      valuation_tool: ${{ steps.filter.outputs.valuation_tool }}
+    steps:
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            platform:
+              - 'apps/platform/**'
+            buyer_search_tool:
+              - 'apps/buyer_search_tool/**'
+            collect_tool:
+              - 'apps/collect_tool/**'
+            valuation_tool:
+              - 'apps/valuation_tool/**'
+
+  react-doctor:
+    needs: changes
+    if: |
+      needs.changes.outputs.platform == 'true' ||
+      needs.changes.outputs.buyer_search_tool == 'true' ||
+      needs.changes.outputs.collect_tool == 'true' ||
+      needs.changes.outputs.valuation_tool == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        run: pnpm --filter @rowan/db run db:generate
+
+      - name: Build project list
+        id: projects
+        run: |
+          list=""
+          [ "${{ needs.changes.outputs.platform }}" == "true" ] && list="${list}@rowan/platform,"
+          [ "${{ needs.changes.outputs.buyer_search_tool }}" == "true" ] && list="${list}@rowan/buyer-search-tool,"
+          [ "${{ needs.changes.outputs.collect_tool }}" == "true" ] && list="${list}@rowan/collect-tool,"
+          [ "${{ needs.changes.outputs.valuation_tool }}" == "true" ] && list="${list}@rowan/valuation-tool,"
+          echo "projects=${list%,}" >> "$GITHUB_OUTPUT"
+
+      - name: Run React Doctor
+        id: doctor
+        run: |
+          FLAGS="--fail-on error --verbose"
+          FLAGS="$FLAGS --project ${{ steps.projects.outputs.projects }}"
+          FLAGS="$FLAGS --diff ${{ github.base_ref }}"
+          npx -y react-doctor@latest . $FLAGS 2>&1 | tee /tmp/react-doctor-output.txt
+          SCORE=$(npx -y react-doctor@latest . --score 2>/dev/null | tail -1 | tr -d '[:space:]')
+          echo "score=${SCORE:-0}" >> "$GITHUB_OUTPUT"
+
+      - name: Post filtered comment
+        uses: actions/github-script@v7
+        if: always() && github.event_name == 'pull_request'
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require("fs");
+            const { execSync } = require("child_process");
+            const path = "/tmp/react-doctor-output.txt";
+            if (!fs.existsSync(path)) return;
+            const raw = fs.readFileSync(path, "utf8").trim();
+            if (!raw) return;
+            const filtered = execSync(
+              `sh scripts/filter-react-doctor-output.sh "${path}"`,
+              { encoding: "utf8", maxBuffer: 10 * 1024 * 1024 }
+            ).trim();
+            if (!filtered) return;
+            const marker = "<!-- react-doctor -->";
+            const body = `${marker}\n## 🩺 React Doctor\n\n\`\`\`\n${filtered}\n\`\`\``;
+            const { data: comments } = await github.rest.issues.listComments({
+              ...context.repo,
+              issue_number: context.issue.number,
+            });
+            const prev = comments.find((c) => c.body?.startsWith(marker));
+            if (prev) {
+              await github.rest.issues.deleteComment({
+                ...context.repo,
+                comment_id: prev.id,
+              });
+            }
+            await github.rest.issues.createComment({
+              ...context.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+
+      - name: Print score
+        run: echo "Health score ${{ steps.doctor.outputs.score }}"

@@ -1,5 +1,5 @@
 # Reference workflow for React Doctor (organization monorepo)
-# This is the companion to Python Doctor for React apps.
+# This is the React companion to Python Doctor.
 # Copy to .github/workflows/react-doctor.yml in your monorepo.
 # Note: Requires scripts/filter-react-doctor-output.sh in your repo.
 

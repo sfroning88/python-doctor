@@ -1,4 +1,4 @@
-name: "Python Doctor"
+name: "Python Doctor for Monorepos"
 description: "Static analysis for Python monorepo apps — lint, types, security, dead code, complexity, and SQL."
 author: "Sean Froning"
 

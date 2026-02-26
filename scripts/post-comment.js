@@ -142,7 +142,7 @@ module.exports = async function postComment({ github, context, core }) {
     // Expose outputs for downstream steps
     core.setOutput("score", String(score));
     core.setOutput("has_findings", String(findings.length > 0));
-    core.info(`🐍 Python Doctor — score: ${score}/100 (${label})`);
+    core.info(`🐍 Python Doctor  — score: ${score}/100 (${label})`);
 
     const isDryRun = process.env.DRY_RUN === "1";
 

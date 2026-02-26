@@ -1,0 +1,10 @@
+# Python Doctor — analysis tools
+# Compile with: pip-compile requirements.in -c constraints.txt
+# See: https://pip-tools.readthedocs.io/en/latest/cli/pip-compile/
+
+ruff
+mypy
+bandit[toml]
+vulture
+radon
+sqlfluff

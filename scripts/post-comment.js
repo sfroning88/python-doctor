@@ -144,8 +144,10 @@ module.exports = async function postComment({ github, context, core }) {
     core.setOutput("has_findings", String(findings.length > 0));
     core.info(`🐍 Python Doctor — score: ${score}/100 (${label})`);
 
+    const isDryRun = process.env.DRY_RUN === "1";
+
     // ── Build comment body ─────────────────────────────────────────────────
-    if (!shouldPost || !isPR || findings.length === 0) {
+    if (!isDryRun && (!shouldPost || !isPR || findings.length === 0)) {
         if (findings.length === 0) {
             core.info("✅ Python Doctor: no issues found — skipping comment.");
         }
@@ -154,7 +156,7 @@ module.exports = async function postComment({ github, context, core }) {
         if (isPR && shouldPost) {
             await deleteExistingComment({ github, context });
         }
-        return;
+        if (!isDryRun) return;
     }
 
     const MARKER = "<!-- python-doctor -->";
@@ -170,7 +172,7 @@ module.exports = async function postComment({ github, context, core }) {
             ? `\n**Passed:** ${clean.map((r) => `${r.tool.label}`).join(" · ")}\n`
             : "";
 
-    const sections = findings.map((r) => renderSection(r.tool, r.content));
+    const sections = findings.length > 0 ? findings.map((r) => renderSection(r.tool, r.content)) : [];
 
     let body = [
         MARKER,
@@ -179,10 +181,8 @@ module.exports = async function postComment({ github, context, core }) {
         `**Health Score: ${score}/100** — ${label}`,
         `\`${bar}\``,
         passedLine,
-        `---`,
-        ``,
-        sections.join("\n\n"),
-    ].join("\n");
+        findings.length > 0 ? `---\n\n${sections.join("\n\n")}` : "",
+    ].filter(Boolean).join("\n");
 
     // Hard truncation safety net
     if (body.length > MAX_COMMENT) {
@@ -191,7 +191,14 @@ module.exports = async function postComment({ github, context, core }) {
         body = body.slice(0, MAX_COMMENT - notice.length) + notice;
     }
 
-    // ── Upsert comment ─────────────────────────────────────────────────────
+    // ── Upsert comment (or dry-run print) ──────────────────────────────────
+    if (isDryRun) {
+        console.log("\n" + "─".repeat(60) + "\n📋 Python Doctor — dry-run comment output:\n" + "─".repeat(60));
+        console.log(body);
+        console.log("─".repeat(60) + "\n");
+        return;
+    }
+
     const { owner, repo } = context.repo;
     const issue_number = context.issue.number;
 

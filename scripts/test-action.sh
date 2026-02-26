@@ -58,33 +58,33 @@ pip install --quiet ruff mypy bandit[toml] vulture radon sqlfluff || {
 # ── Run analysis tools ─────────────────────────────────────────────────────
 echo "🔍 Running Ruff..."
 cd "$APP_PATH"
-xargs -a /tmp/pydoctor_relative_py.txt -r ruff check --output-format=full 2>&1 | tee /tmp/pydoctor_ruff.txt || true
+xargs ruff check --output-format=full 2>&1 < /tmp/pydoctor_relative_py.txt | tee /tmp/pydoctor_ruff.txt || true
 
 echo "🔷 Running mypy..."
-xargs -a /tmp/pydoctor_relative_py.txt -r mypy --ignore-missing-imports 2>&1 | tee /tmp/pydoctor_mypy.txt || true
+xargs mypy --ignore-missing-imports 2>&1 < /tmp/pydoctor_relative_py.txt | tee /tmp/pydoctor_mypy.txt || true
 
 echo "🔒 Running Bandit..."
-xargs -a /tmp/pydoctor_relative_py.txt -r bandit -ll 2>&1 | tee /tmp/pydoctor_bandit.txt || true
+xargs bandit -ll 2>&1 < /tmp/pydoctor_relative_py.txt | tee /tmp/pydoctor_bandit.txt || true
 
 echo "🪦 Running Vulture..."
-xargs -a /tmp/pydoctor_relative_py.txt -r vulture --min-confidence 80 2>&1 | tee /tmp/pydoctor_vulture.txt || true
+xargs vulture --min-confidence 80 2>&1 < /tmp/pydoctor_relative_py.txt | tee /tmp/pydoctor_vulture.txt || true
 
 echo "📐 Running Radon..."
 {
-    xargs -a /tmp/pydoctor_relative_py.txt -r radon cc -s -n C 2>&1 || true
-    xargs -a /tmp/pydoctor_relative_py.txt -r radon mi -s -n B 2>&1 || true
+    xargs radon cc -s -n C 2>&1 < /tmp/pydoctor_relative_py.txt || true
+    xargs radon mi -s -n B 2>&1 < /tmp/pydoctor_relative_py.txt || true
 } | tee /tmp/pydoctor_radon.txt
 
 echo "🗄️ Running SQLFluff..."
 if [ -s /tmp/pydoctor_changed_sql.txt ]; then
-    xargs -a /tmp/pydoctor_relative_sql.txt -r sqlfluff lint --dialect postgres 2>&1 | tee /tmp/pydoctor_sqlfluff.txt || true
+    xargs sqlfluff lint --dialect postgres 2>&1 < /tmp/pydoctor_relative_sql.txt | tee /tmp/pydoctor_sqlfluff.txt || true
 else
     echo "" > /tmp/pydoctor_sqlfluff.txt
 fi
 
 echo "📝 Running markdownlint..."
 if [ -s /tmp/pydoctor_changed_md.txt ]; then
-    xargs -a /tmp/pydoctor_relative_md.txt -r npx -y markdownlint-cli@latest 2>&1 | tee /tmp/pydoctor_markdownlint.txt || true
+    xargs npx -y markdownlint-cli@latest 2>&1 < /tmp/pydoctor_relative_md.txt | tee /tmp/pydoctor_markdownlint.txt || true
 else
     echo "" > /tmp/pydoctor_markdownlint.txt
 fi

@@ -1,0 +1,3 @@
+# Version constraints for pip-compile
+# Keeps resolver output stable across environments
+# Add caps here for packages with known compatibility issues

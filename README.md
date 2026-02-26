@@ -100,6 +100,33 @@ Use outputs to gate downstream steps, e.g. fail the job if score drops below a t
   run: exit 1
 ```
 
+## Local Testing
+
+To install the first time:
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install --upgrade pip pip-tools
+pip-compile requirements.in -c constraints.txt -o requirements.txt
+pip install -r requirements.txt
+```
+
+If `requirements.in` ever changes:
+
+```bash
+source venv/bin/activate
+pip-compile requirements.in -c constraints.txt -o requirements.txt
+pip install -r requirements.txt
+```
+
+To upgrade all packages to latest:
+
+```bash
+pip-compile requirements.in -c constraints.txt -o requirements.txt -U
+pip install -r requirements.txt
+```
+
 ## Publishing to the Marketplace
 
 1. Create a **public** repository with `action.yml` at the root

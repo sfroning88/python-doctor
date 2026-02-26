@@ -1,12 +1,12 @@
-# Python Doctor
+# Python Doctor for Monorepos
 
-Static analysis for Python, Markdown, and SQL — lint, types, security, dead code, complexity, and more. Get a **0–100 health score** with actionable diagnostics posted to your PRs.
+Static analysis for Python monorepo apps — lint, types, security, dead code, complexity, and more. Get a **0–100 health score** with actionable diagnostics posted to your PRs.
 
 Inspired by [React Doctor](https://github.com/millionco/react-doctor), but minimal: no CLI bundling, only a GitHub Action.
 
 ## How it works
 
-Python Doctor runs six lightweight tools **only on changed files** in your PR:
+Python Doctor for Monorepos runs six lightweight tools **only on changed files** in your PR:
 
 1. **Ruff** — Fast linter + style (replaces flake8, isort, pyupgrade)
 2. **mypy** — Static type checking
@@ -23,7 +23,7 @@ Findings are weighted by severity to produce a 0–100 score. Results are posted
 Add to your workflow (e.g. `.github/workflows/python-doctor.yml`):
 
 ```yaml
-name: Python Doctor
+name: Python Doctor for Monorepos
 
 on:
   pull_request:

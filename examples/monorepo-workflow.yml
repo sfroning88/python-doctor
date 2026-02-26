@@ -1,10 +1,10 @@
-# Example workflow for a monorepo using Python Doctor
+# Example workflow for a monorepo using Python Doctor for Monorepos
 # Copy this to your repo: .github/workflows/python-doctor.yml
 #
 # Replace OWNER/python-doctor with your published action (e.g. seanfroning/python-doctor@v1)
 # or use @main for development before publishing a release.
 
-name: Python Doctor
+name: Python Doctor for Monorepos
 
 on:
   pull_request:
@@ -37,7 +37,7 @@ jobs:
       pull-requests: write
       issues: write
     steps:
-      - name: Run Python Doctor
+      - name: Run Python Doctor for Monorepos
         id: doctor
         uses: OWNER/python-doctor@v1
         with:

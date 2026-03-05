@@ -9,58 +9,32 @@ const fs = require("fs");
 // ── Tool definitions ────────────────────────────────────────────────────────
 // weight: how many points are deducted from 100 if this tool has findings.
 // Weights sum to 100 so a clean run always scores exactly 100.
+// Weights are set per preset (see SCORE_PRESETS below).
 const TOOLS = [
-    {
-        id: "ruff",
-        label: "🔍 Ruff",
-        desc: "lint + style",
-        file: "/tmp/pydoctor_ruff.txt",
-        weight: 20,
-        envFlag: "RUFF_ENABLED",        // not used here, tool steps are gated in action.yml
-    },
-    {
-        id: "mypy",
-        label: "🔷 mypy",
-        desc: "type check",
-        file: "/tmp/pydoctor_mypy.txt",
-        weight: 20,
-    },
-    {
-        id: "bandit",
-        label: "🔒 Bandit",
-        desc: "security",
-        file: "/tmp/pydoctor_bandit.txt",
-        weight: 20,
-    },
-    {
-        id: "vulture",
-        label: "🪦 Vulture",
-        desc: "dead code",
-        file: "/tmp/pydoctor_vulture.txt",
-        weight: 15,
-    },
-    {
-        id: "radon",
-        label: "📐 Radon",
-        desc: "complexity",
-        file: "/tmp/pydoctor_radon.txt",
-        weight: 15,
-    },
-    {
-        id: "sqlfluff",
-        label: "🗄️ SQLFluff",
-        desc: "SQL",
-        file: "/tmp/pydoctor_sqlfluff.txt",
-        weight: 8,
-    },
-    {
-        id: "markdownlint",
-        label: "📝 markdownlint",
-        desc: "Markdown",
-        file: "/tmp/pydoctor_markdownlint.txt",
-        weight: 2,
-    },
+    { id: "ruff", label: "🔍 Ruff", desc: "lint + style", file: "/tmp/pydoctor_ruff.txt" },
+    { id: "mypy", label: "🔷 mypy", desc: "type check", file: "/tmp/pydoctor_mypy.txt" },
+    { id: "bandit", label: "🔒 Bandit", desc: "security", file: "/tmp/pydoctor_bandit.txt" },
+    { id: "vulture", label: "🪦 Vulture", desc: "dead code", file: "/tmp/pydoctor_vulture.txt" },
+    { id: "radon", label: "📐 Radon", desc: "complexity", file: "/tmp/pydoctor_radon.txt" },
+    { id: "sqlfluff", label: "🗄️ SQLFluff", desc: "SQL", file: "/tmp/pydoctor_sqlfluff.txt" },
+    { id: "markdownlint", label: "📝 markdownlint", desc: "Markdown", file: "/tmp/pydoctor_markdownlint.txt" },
 ];
+
+// Score presets: weights per tool (must sum to 100).
+// - balanced: equal weight (16/17 pts each), extra to structure (Vulture, Radon, Bandit)
+// - structure: heavy on Vulture, Radon, Bandit; minimal on Ruff, SQLFluff, MarkdownLint
+// - quality: heavy on Ruff, SQLFluff, MarkdownLint; minimal on Vulture, Radon, Bandit
+const SCORE_PRESETS = {
+    balanced: {
+        ruff: 14, mypy: 14, bandit: 15, vulture: 15, radon: 15, sqlfluff: 14, markdownlint: 13,
+    },
+    structure: {
+        ruff: 2, mypy: 2, bandit: 30, vulture: 30, radon: 30, sqlfluff: 3, markdownlint: 3,
+    },
+    quality: {
+        ruff: 23, mypy: 23, bandit: 3, vulture: 3, radon: 3, sqlfluff: 23, markdownlint: 22,
+    },
+};
 
 // Noise phrases — if a file contains only these, treat it as clean
 const NOISE = [
@@ -107,12 +81,16 @@ function renderSection(tool, content) {
     ].join("\n");
 }
 
-/** Map a score to a label + emoji. */
-function scoreLabel(score) {
-    if (score >= 90) return { emoji: "😊", label: "Great" };
-    if (score >= 75) return { emoji: "🙂", label: "Good" };
-    if (score >= 50) return { emoji: "😐", label: "Needs work" };
-    return { emoji: "😞", label: "Critical" };
+// Base URL for nurse reaction images (raw GitHub content)
+const DEFAULT_IMAGES_BASE = "https://raw.githubusercontent.com/seanfroning/python-nurse/main/assets/nurses";
+
+/** Map a score to a label + nurse image. */
+function scoreLabel(score, imagesBase) {
+    const base = imagesBase || DEFAULT_IMAGES_BASE;
+    if (score >= 90) return { label: "Great", image: `![Great](${base}/great.jpeg)` };
+    if (score >= 75) return { label: "Good", image: `![Good](${base}/good.jpeg)` };
+    if (score >= 50) return { label: "Needs work", image: `![Needs work](${base}/needs-work.jpeg)` };
+    return { label: "Critical", image: `![Critical](${base}/critical.jpeg)` };
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────
@@ -125,8 +103,13 @@ module.exports = async function postComment({ github, context, core }) {
     const shouldPost = (process.env.POST_COMMENT ?? "true") === "true";
     const isPR = context.eventName === "pull_request";
 
+    // ── Resolve preset and apply weights ───────────────────────────────────
+    const preset = (process.env.SCORE_PRESET ?? "balanced").toLowerCase();
+    const presetWeights = SCORE_PRESETS[preset] ?? SCORE_PRESETS.balanced;
+    const toolsWithWeights = TOOLS.map((t) => ({ ...t, weight: presetWeights[t.id] ?? 14 }));
+
     // ── Evaluate each tool ─────────────────────────────────────────────────
-    const results = TOOLS.map((tool) => ({
+    const results = toolsWithWeights.map((tool) => ({
         tool,
         ...readTool(tool),
     }));
@@ -137,7 +120,7 @@ module.exports = async function postComment({ github, context, core }) {
     // ── Score ──────────────────────────────────────────────────────────────
     const deducted = findings.reduce((sum, r) => sum + r.tool.weight, 0);
     const score = Math.max(0, 100 - deducted);
-    const { emoji, label } = scoreLabel(score);
+    const { label, image } = scoreLabel(score, process.env.IMAGES_BASE_URL);
 
     // Expose outputs for downstream steps
     core.setOutput("score", String(score));
@@ -176,9 +159,11 @@ module.exports = async function postComment({ github, context, core }) {
 
     let body = [
         MARKER,
-        `## 🐍 Python Doctor ${emoji}`,
+        `## 🐍 Python Nurse`,
         ``,
         `**Health Score: ${score}/100** — ${label}`,
+        ``,
+        image,
         `\`${bar}\``,
         passedLine,
         findings.length > 0 ? `---\n\n${sections.join("\n\n")}` : "",

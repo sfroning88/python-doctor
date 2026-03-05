@@ -1,4 +1,4 @@
-name: "Python Doctor for Monorepos"
+name: "Python Nurse"
 description: "Static analysis for Python monorepo apps — lint, types, security, dead code, complexity, and SQL."
 author: "Sean Froning"
 
@@ -69,6 +69,14 @@ inputs:
     description: "Whether to post results as a PR comment"
     required: false
     default: "true"
+  score-preset:
+    description: "Scoring weight preset: balanced (equal), structure (Vulture/Radon/Bandit heavy), quality (Ruff/SQLFluff/MarkdownLint heavy)"
+    required: false
+    default: "balanced"
+  images-base-url:
+    description: "Base URL for nurse reaction images (override if forking)"
+    required: false
+    default: "https://raw.githubusercontent.com/seanfroning/python-nurse/main/assets/nurses"
 
 outputs:
   score:
@@ -225,6 +233,8 @@ runs:
       if: always()
       env:
         POST_COMMENT: ${{ inputs.post-comment }}
+        SCORE_PRESET: ${{ inputs.score-preset }}
+        IMAGES_BASE_URL: ${{ inputs.images-base-url }}
         GITHUB_TOKEN: ${{ inputs.github-token }}
       with:
         github-token: ${{ inputs.github-token }}

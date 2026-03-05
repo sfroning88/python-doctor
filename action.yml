@@ -76,7 +76,7 @@ inputs:
   images-base-url:
     description: "Base URL for nurse reaction images (override if forking)"
     required: false
-    default: "https://raw.githubusercontent.com/seanfroning/python-nurse/main/assets/nurses"
+    default: "https://raw.githubusercontent.com/sfroning88/python-nurse/main/assets/nurses"
 
 outputs:
   score:

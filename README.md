@@ -1,4 +1,4 @@
-# Python Doctor for Monorepos
+# Python Nurse
 
 Static analysis for Python monorepo apps — lint, types, security, dead code, complexity, and more. Get a **0–100 health score** with actionable diagnostics posted to your PRs.
 
@@ -6,7 +6,7 @@ Inspired by [React Doctor](https://github.com/millionco/react-doctor), but minim
 
 ## How it works
 
-Python Doctor for Monorepos runs six lightweight tools **only on changed files** in your PR:
+Python Nurse runs seven lightweight tools **only on changed files** in your PR:
 
 1. **Ruff** — Fast linter + style (replaces flake8, isort, pyupgrade)
 2. **mypy** — Static type checking
@@ -16,42 +16,54 @@ Python Doctor for Monorepos runs six lightweight tools **only on changed files**
 6. **SQLFluff** — SQL linting (PostgreSQL, MySQL, ANSI, etc.)
 7. **markdownlint** — Markdown style and consistency
 
-Findings are weighted by severity to produce a 0–100 score. Results are posted as a collapsible PR comment with per-tool sections.
+Findings are weighted by severity to produce a 0–100 score. Results are posted as a collapsible PR comment with per-tool sections and a nurse reaction image based on the score.
 
 ## GitHub Actions
 
-Add to your workflow (e.g. `.github/workflows/python-doctor.yml`):
+Add to your workflow (e.g. `.github/workflows/python-nurse.yml`):
 
 ```yaml
-name: Python Doctor for Monorepos
+name: Python Nurse
 
 on:
   pull_request:
     branches: [main]
 
 jobs:
-  python-doctor:
+  python-nurse:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: write
       issues: write
     steps:
-      - uses: OWNER/python-doctor@v1
+      - uses: OWNER/python-nurse@v1
         with:
           app-path: apps/worker
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          score-preset: balanced   # balanced | structure | quality
 ```
 
-Replace `OWNER` with your GitHub username or org (e.g. `seanfroning/python-doctor@v1`).
+Replace `OWNER` with your GitHub username or org (e.g. `seanfroning/python-nurse@v1`).
 
 ### Minimal integration
 
 ```yaml
-- uses: OWNER/python-doctor@v1
+- uses: OWNER/python-nurse@v1
   with:
     app-path: apps/worker
     github-token: ${{ secrets.GITHUB_TOKEN }}
+```
+
+### With score preset and images
+
+```yaml
+- uses: OWNER/python-nurse@v1
+  with:
+    app-path: apps/worker
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    score-preset: structure   # structure-heavy (Vulture/Radon/Bandit) or quality (Ruff/SQLFluff/MarkdownLint)
+    # images-base-url: "https://..."  # optional: override if forking (nurse reaction images)
 ```
 
 ### With path filtering (monorepo)
@@ -78,6 +90,8 @@ See [examples/monorepo-workflow.yml](examples/monorepo-workflow.yml) for a full 
 | `sqlfluff-dialect` | `postgres` | SQL dialect (postgres, mysql, ansi, etc.) |
 | `install-dependencies` | `true` | Install project `requirements.txt` before analysis |
 | `post-comment` | `true` | Post results as a PR comment |
+| `score-preset` | `balanced` | Scoring weights: `balanced` (equal, extra to structure), `structure` (Vulture/Radon/Bandit heavy), `quality` (Ruff/SQLFluff/MarkdownLint heavy) |
+| `images-base-url` | *(see default)* | Base URL for nurse reaction images in PR comments; override if forking |
 
 ## Outputs
 
@@ -89,14 +103,14 @@ See [examples/monorepo-workflow.yml](examples/monorepo-workflow.yml) for a full 
 Use outputs to gate downstream steps, e.g. fail the job if score drops below a threshold:
 
 ```yaml
-- uses: OWNER/python-doctor@v1
-  id: doctor
+- uses: OWNER/python-nurse@v1
+  id: nurse
   with:
     app-path: apps/worker
     github-token: ${{ secrets.GITHUB_TOKEN }}
 
 - name: Fail if score too low
-  if: steps.doctor.outputs.score < '70'
+  if: steps.nurse.outputs.score < '70'
   run: exit 1
 ```
 

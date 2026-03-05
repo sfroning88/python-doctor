@@ -1,10 +1,13 @@
-# Example workflow for a monorepo using Python Doctor for Monorepos
-# Copy this to your repo: .github/workflows/python-doctor.yml
+# Example workflow for a monorepo using Python Nurse
+# Copy this to your repo: .github/workflows/python-nurse.yml
 #
-# Replace OWNER/python-doctor with your published action (e.g. seanfroning/python-doctor@v1)
+# Replace OWNER/python-nurse with your published action (e.g. seanfroning/python-nurse@v1)
 # or use @main for development before publishing a release.
+#
+# Score presets: balanced (default), structure (Vulture/Radon/Bandit heavy), quality (Ruff/SQLFluff/MarkdownLint heavy)
+# PR comments include nurse reaction images; override images-base-url if forking.
 
-name: Python Doctor for Monorepos
+name: Python Nurse
 
 on:
   pull_request:
@@ -28,7 +31,7 @@ jobs:
             worker_changed:
               - 'apps/worker/**'
 
-  python-doctor:
+  python-nurse:
     needs: changes
     if: needs.changes.outputs.worker_changed == 'true'
     runs-on: ubuntu-latest
@@ -37,13 +40,17 @@ jobs:
       pull-requests: write
       issues: write
     steps:
-      - name: Run Python Doctor for Monorepos
-        id: doctor
-        uses: OWNER/python-doctor@v1
+      - name: Run Python Nurse
+        id: nurse
+        uses: OWNER/python-nurse@v1
         with:
           app-path: apps/worker
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          # score-preset: balanced | structure | quality
+          score-preset: balanced
+          # images-base-url: override if forking (default: raw.githubusercontent.com/OWNER/python-nurse/main/assets/nurses)
+          # images-base-url: "https://raw.githubusercontent.com/YOUR_ORG/python-nurse/main/assets/nurses"
 
       - name: Print score
         if: always()
-        run: echo "Health score ${{ steps.doctor.outputs.score }}/100"
+        run: echo "Health score ${{ steps.nurse.outputs.score }}/100"

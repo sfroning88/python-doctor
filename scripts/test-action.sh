@@ -71,7 +71,7 @@ xargs vulture --min-confidence 80 2>&1 < /tmp/pydoctor_relative_py.txt | tee /tm
 
 echo "📐 Running Radon..."
 {
-    xargs radon cc -s -n C 2>&1 < /tmp/pydoctor_relative_py.txt || true
+    xargs radon cc -s -n D 2>&1 < /tmp/pydoctor_relative_py.txt || true
     xargs radon mi -s -n B 2>&1 < /tmp/pydoctor_relative_py.txt || true
 } | tee /tmp/pydoctor_radon.txt
 

@@ -5,7 +5,7 @@
 # or use @main for development before publishing a release.
 #
 # Score presets: balanced (default), structure (Vulture/Radon/Bandit heavy), quality (Ruff/SQLFluff/MarkdownLint heavy)
-# PR comments include nurse reaction images; override images-base-url if forking.
+# PR comments include nurse reaction images (auto-resolved from the action repo; set images-base-url when forking).
 
 name: Python Nurse
 
@@ -48,7 +48,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           # score-preset: balanced | structure | quality
           score-preset: balanced
-          # images-base-url: override if forking (default: raw.githubusercontent.com/OWNER/python-nurse/main/assets/nurses)
+          # images-base-url: optional; auto-resolves from the action repo; set when forking:
           # images-base-url: "https://raw.githubusercontent.com/YOUR_ORG/python-nurse/main/assets/nurses"
 
       - name: Print score

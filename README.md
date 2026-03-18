@@ -63,7 +63,7 @@ Replace `OWNER` with your GitHub username or org (e.g. `seanfroning/python-nurse
     app-path: apps/worker
     github-token: ${{ secrets.GITHUB_TOKEN }}
     score-preset: structure   # structure-heavy (Vulture/Radon/Bandit) or quality (Ruff/SQLFluff/MarkdownLint)
-    # images-base-url: "https://..."  # optional: override if forking (nurse reaction images)
+    # images-base-url: optional; auto-resolves from the action repo; set when forking
 ```
 
 ### With path filtering (monorepo)
@@ -91,7 +91,7 @@ See [examples/monorepo-workflow.yml](examples/monorepo-workflow.yml) for a full 
 | `install-dependencies` | `true` | Install project `requirements.txt` before analysis |
 | `post-comment` | `true` | Post results as a PR comment |
 | `score-preset` | `balanced` | Scoring weights: `balanced` (equal, extra to structure), `structure` (Vulture/Radon/Bandit heavy), `quality` (Ruff/SQLFluff/MarkdownLint heavy) |
-| `images-base-url` | *(see default)* | Base URL for nurse reaction images in PR comments; override if forking |
+| `images-base-url` | *(auto)* | Base URL for nurse reaction images. Auto-resolves from the action repo; set explicitly when forking (e.g. `https://raw.githubusercontent.com/YOUR_ORG/python-nurse/main/assets/nurses`) |
 
 ## Outputs
 

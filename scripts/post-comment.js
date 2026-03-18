@@ -41,22 +41,35 @@ const NOISE = [
     /^no python files/i,
     /^no sql files/i,
     /^no issues/i,
+    /no issues identified/i,
     /^success/i,
     /^\s*$/,
 ];
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Read a tool output file. Returns { content, hasFindings }. */
+/** Read a tool output file. Returns { content, hasFindings, findingCount }. */
 function readTool(tool) {
     if (!fs.existsSync(tool.file)) {
-        return { content: null, hasFindings: false };
+        return { content: null, hasFindings: false, findingCount: 0 };
     }
     const raw = fs.readFileSync(tool.file, "utf8").trim();
     if (!raw || NOISE.some((re) => re.test(raw))) {
-        return { content: null, hasFindings: false };
+        return { content: null, hasFindings: false, findingCount: 0 };
     }
-    return { content: raw, hasFindings: true };
+    const findingCount = countFindings(raw);
+    return { content: raw, hasFindings: true, findingCount };
+}
+
+const FINDING_LINE = /:\d+[\s:]|\b(High|Medium|Low)\s+confidence|-\s+[B-F]\s+\(/;
+
+function countFindings(content) {
+    return content.split("\n").filter((line) => FINDING_LINE.test(line)).length;
+}
+
+function scaledDeduction(weight, findingCount) {
+    const factor = Math.min(1, Math.max(1, findingCount) / 5);
+    return Math.round(weight * factor);
 }
 
 /** Render a collapsible section for a tool that has findings. */
@@ -81,12 +94,22 @@ function renderSection(tool, content) {
     ].join("\n");
 }
 
-// Base URL for nurse reaction images (raw GitHub content)
-const DEFAULT_IMAGES_BASE = "https://raw.githubusercontent.com/seanfroning/python-nurse/main/assets/nurses";
+const FALLBACK_IMAGES_BASE = "https://raw.githubusercontent.com/sfroning88/python-nurse/main/assets/nurses";
+
+function resolveImagesBase(imagesBase) {
+    if (imagesBase) return imagesBase;
+    const repo = process.env.ACTION_REPOSITORY;
+    const ref = process.env.ACTION_REF || "main";
+    if (repo) return `https://raw.githubusercontent.com/${repo}/${ref}/assets/nurses`;
+    const actionPath = process.env.GITHUB_ACTION_PATH || "";
+    const match = actionPath.match(/(?:actions|_actions)[\/]([^\/]+)[\/]([^\/]+)[\/]([^\/]+)/);
+    if (match) return `https://raw.githubusercontent.com/${match[1]}/${match[2]}/${match[3]}/assets/nurses`;
+    return FALLBACK_IMAGES_BASE;
+}
 
 /** Map a score to a label + nurse image. */
 function scoreLabel(score, imagesBase) {
-    const base = imagesBase || DEFAULT_IMAGES_BASE;
+    const base = resolveImagesBase(imagesBase);
     if (score >= 90) return { label: "Great", image: `![Great](${base}/great.jpeg)` };
     if (score >= 75) return { label: "Good", image: `![Good](${base}/good.jpeg)` };
     if (score >= 50) return { label: "Needs work", image: `![Needs work](${base}/needs-work.jpeg)` };
@@ -118,7 +141,10 @@ module.exports = async function postComment({ github, context, core }) {
     const clean = results.filter((r) => !r.hasFindings);
 
     // ── Score ──────────────────────────────────────────────────────────────
-    const deducted = findings.reduce((sum, r) => sum + r.tool.weight, 0);
+    const deducted = findings.reduce(
+        (sum, r) => sum + scaledDeduction(r.tool.weight, r.findingCount),
+        0
+    );
     const score = Math.max(0, 100 - deducted);
     const { label, image } = scoreLabel(score, process.env.IMAGES_BASE_URL);
 

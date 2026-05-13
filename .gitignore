@@ -223,3 +223,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# macOs folder icons
+Icon?
+
+# Test fixtures
+test-fixture
+test-fixture/**
